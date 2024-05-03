@@ -77,6 +77,37 @@ def perform_fft(data):
     
     return fft_data
 
+def split_data(data, latest_train_date, data_label=''):
+
+    # split df
+    train_df = data.loc[:latest_train_date]
+    test_df = data.drop(index=train_df.index)
+
+    # create torch CustomDataLoader
+    dataloader = CustomDataLoader(data, batch_size=1, shuffle=False, sequence_length=sequence_length)
+
+    # split dataloader for train and test
+    split_index = int(len(dataloader) * train_test_split)
+    train_subset = Subset(dataloader, range(0          , split_index    ))
+    test_subset  = Subset(dataloader, range(split_index, len(dataloader)))
+
+    # create dataloaders
+    train_loader_shuffle = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_subset, batch_size=1)
+
+    return {        
+        f'{data_label}dataloader': dataloader,
+        f'{data_label}train_subset': train_subset,
+        f'{data_label}train_loader': train_loader,
+        f'{data_label}train_loader_shuffle': train_loader_shuffle,
+        f'{data_label}test_subset': test_subset,
+        f'{data_label}test_loader': test_loader,
+        f'{data_label}train_df': train_df,
+        f'{data_label}test_df': test_df,
+        f'{data_label}split_index': split_index,
+    }
+
 def get_data():
     
     try:
@@ -99,44 +130,18 @@ def get_data():
     # put the data in frequency space using fft
     fft_data = perform_fft(norm_data)
 
-    # split df
-    train_df = fft_data.loc[:latest_train_date]
-    test_df = fft_data.drop(index=train_df.index)
-
-    # create torch CustomDataLoader
-    dataloader = CustomDataLoader(fft_data, batch_size=1, shuffle=False, sequence_length=sequence_length)
-
-    # split dataloader for train and test
-    split_index = int(len(dataloader) * train_test_split)
-    train_subset = Subset(dataloader, range(0          , split_index    ))
-    test_subset  = Subset(dataloader, range(split_index, len(dataloader)))
-
-    # create dataloaders
-    train_loader_shuffle = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=False)
-
-    test_loader = DataLoader(test_subset, batch_size=1)
 
     out = {
         'data': data,
         'norm_data': norm_data,
         'fft_data': fft_data,
 
-        'train_df': train_df,
-        'test_df': test_df,
-
         'latest_train_date': latest_train_date,
-        'split_index': split_index,
         'sequence_length': sequence_length,
         'batch_size': batch_size,
-
-        'dataloader': dataloader,
-        'train_subset': train_subset,
-        'train_loader': train_loader,
-        'train_loader_shuffle': train_loader_shuffle,
-        'test_subset': test_subset,
-        'test_loader': test_loader,
-
     }
+
+    out.update(split_data(norm_data, latest_train_date, data_label=''))
+    out.update(split_data(fft_data, latest_train_date, data_label='fft'))
 
     return out
