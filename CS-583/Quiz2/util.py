@@ -9,7 +9,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 import os
 import pandas as pd
 
-from data import get_data
+from data import get_data, reverse_fft
 
 
 # ========= Unpack data so utils can reference it ========= 
@@ -24,6 +24,27 @@ sequence_length = data_dict['sequence_length']
 
 # ========================================================= 
 
+def plot_fft_data(cos_ax, sin_ax, alpha=1):
+
+    cos_ax.set_ylabel('Signal Strength')
+    cos_ax.set_title('FFT of Index (IPG2211A2N) (Cosine Frequencies)')
+    cos_ax.set_xlabel('Frequency (per month)')
+
+    cos_ax.plot(np.real(data_dict['fft_train_df']['POINTS']), label='train (cos)', color='blue', alpha=alpha)
+    cos_ax.plot(np.real(data_dict['fft_test_df' ]['POINTS']), label='test (cos)' , color='red' , alpha=alpha)
+    cos_ax.grid()
+
+    cos_ax.xaxis.set_major_locator(plt.MaxNLocator(18))
+    cos_ax.tick_params(axis='x', labelrotation=90)
+    cos_ax.grid()
+
+    sin_ax.set_ylabel('Signal Strength')
+    sin_ax.set_title('FFT of Index (IPG2211A2N) (Sine Frequencies)')
+
+    sin_ax.plot(np.imag(data_dict['fft_train_df']['POINTS']), label='train (sin)', color='blue', alpha=alpha)
+    sin_ax.plot(np.imag(data_dict['fft_test_df' ]['POINTS']), label='test (sin)' , color='red' , alpha=alpha)
+
+
 def plot_data(ax, alpha=1):
 
     ax.set_xlabel('Date')
@@ -37,7 +58,7 @@ def plot_data(ax, alpha=1):
     ax.tick_params(axis='x', labelrotation=90)
     ax.grid()
 
-def evaluate_model(model, num_epochs, lr, model_type=None, **train_kwargs):
+def evaluate_model(model, num_epochs, lr, model_type=None, fft=False, **train_kwargs):
 
     if model_type is None:
         # optimization
@@ -50,10 +71,11 @@ def evaluate_model(model, num_epochs, lr, model_type=None, **train_kwargs):
             criterion=criterion, 
             optimizer=optimizer, 
             num_epochs=num_epochs,
+            fft=fft,
         )
 
         # test
-        test_model(model=model, loss_log=loss_log)
+        test_model(model=model, loss_log=loss_log, fft=fft)
 
     elif model_type == 'gan':
 
@@ -122,8 +144,8 @@ def test_gan_model(loss_log, **kwargs):
     model_metrics = get_metrics(train_pred, test_pred)
     save_metrics(model_name, model_metrics)
 
-    pred_ax.plot(train.index, train_pred.detach(), label='train-prediction', color='orange', linestyle='--', linewidth=5, alpha=1)
-    pred_ax.plot(test.index , test_pred.detach() , label='test-prediction' , color='green' , linestyle='--', linewidth=5, alpha=1)
+    pred_ax.plot(train.index, train_pred.detach(), label='train-prediction', color='orange', linewidth=2, alpha=1)
+    pred_ax.plot(test.index , test_pred.detach() , label='test-prediction' , color='green' , linewidth=2, alpha=1)
     
     plot_data(pred_ax, alpha=0.5)
 
@@ -141,19 +163,27 @@ def test_gan_model(loss_log, **kwargs):
 
     fig.legend(loc='upper right')
 
-    plt.savefig(f'./model_evaluations/{model_name}.png')
+    try:
+        plt.savefig(f'./model_evaluations/{model_name}.png')
+    except:       
+        plt.savefig(f'../model_evaluations/{model_name}.png')
     plt.show()
     
     return model_metrics
 
-def train_model(model, criterion, optimizer, num_epochs):
+def train_model(model, criterion, optimizer, num_epochs, fft=False):
     
+    if fft:
+        loader = data_dict['fft_train_loader_shuffle']
+    else:
+        loader = data_dict['train_loader_shuffle']
+
     losses = {}
 
     # train network
     for epoch in tqdm(range(num_epochs), desc=f'Training {model.__class__.__name__}', total=num_epochs):
 
-        for date_index, y_true in train_loader_shuffle:
+        for date_index, y_true in loader:
 
             date_index = date_index[0].float()
             y_true = y_true[0].float()[:, np.newaxis]
@@ -171,24 +201,31 @@ def train_model(model, criterion, optimizer, num_epochs):
 
     return losses
 
-def test_model(model, loss_log, test_pred_adjustment_func=None):
+def test_model(model, loss_log, test_pred_adjustment_func=None, fft=False):
 
     model_name = model.__class__.__name__
     model.eval()
 
+    if fft:
+        train_loader = data_dict['fft_train_loader']
+        test_loader = data_dict['fft_test_loader']
+    else:
+        train_loader = data_dict['train_loader']
+        test_loader = data_dict['test_loader']
+
     fig, (pred_ax, loss_ax) = plt.subplots(2, 1, figsize=(7, 10))
     plt.subplots_adjust(wspace=0.4,hspace=0.4)
     
-    train_pred = predict_full_series(model, train_loader, sequence_length=sequence_length, train_or_test='train')
-    test_pred =  predict_full_series(model, test_loader , sequence_length=sequence_length, train_or_test='test' )    
+    train_pred = predict_full_series(model, train_loader, sequence_length=sequence_length, train_or_test='train', fft=fft)
+    test_pred =  predict_full_series(model, test_loader , sequence_length=sequence_length, train_or_test='test' , fft=fft)    
 
     model_metrics = get_metrics(train_pred, test_pred)
     save_metrics(model_name, model_metrics)
 
     if test_pred_adjustment_func is not None: test_pred = test_pred_adjustment_func(test_pred)
 
-    pred_ax.plot(train.index, train_pred.detach(), label='train-prediction', color='orange', linestyle='--', linewidth=5, alpha=1)
-    pred_ax.plot(test.index , test_pred.detach() , label='test-prediction' , color='green' , linestyle='--', linewidth=5, alpha=1)
+    pred_ax.plot(train.index, train_pred.detach(), label='train-prediction', color='orange', linewidth=2, alpha=1)
+    pred_ax.plot(test.index , test_pred.detach() , label='test-prediction' , color='green' , linewidth=2, alpha=1)
     
     plot_data(pred_ax, alpha=0.5)
 
@@ -209,7 +246,7 @@ def test_model(model, loss_log, test_pred_adjustment_func=None):
 
     return model_metrics
 
-def predict_full_series(model, dataloader, sequence_length, train_or_test: Literal['train', 'test']):
+def predict_full_series(model, dataloader, sequence_length, train_or_test: Literal['train', 'test'], fft=False):
     
     model.eval()  # Set the model to evaluation mode
     df = data_dict[f'{train_or_test}_df']
@@ -224,7 +261,12 @@ def predict_full_series(model, dataloader, sequence_length, train_or_test: Liter
             output = model(x_sequence[0])  # Predict
             output = output.squeeze().detach()  # Remove batch dimension and detach from graph
             
-            predictions[i:i + sequence_length] += output  # Add predictions to their positions
+            if fft:
+                pred = reverse_fft(output)
+            else:
+                pred = output
+
+            predictions[i:i + sequence_length] += pred  # Add predictions to their positions
             counts[     i:i + sequence_length] += 1       # Increment counts for averaging
 
     counts[counts == 0] += 1 # avoid divide by zero issues
@@ -259,13 +301,13 @@ def get_metrics(train_pred, test_pred):
 
     full_pred = np.append(train_pred, test_pred)
     
-    train_r2_score = r2_score(train['POINTS']                , train_pred)
-    test_r2_score  = r2_score(test[ 'POINTS']                , test_pred )
-    full_r2_score =  r2_score(data_dict['fft_data']['POINTS'], full_pred )
+    train_r2_score = r2_score(train['POINTS']                 , train_pred)
+    test_r2_score  = r2_score(test[ 'POINTS']                 , test_pred )
+    full_r2_score  = r2_score(data_dict['norm_data']['POINTS'], full_pred )
 
-    train_mean_squared_error = mean_squared_error(train['POINTS']                , train_pred)
-    test_mean_squared_error  = mean_squared_error(test[ 'POINTS']                , test_pred )
-    full_mean_squared_error =  mean_squared_error(data_dict['fft_data']['POINTS'], full_pred )
+    train_mean_squared_error = mean_squared_error(train['POINTS']                 , train_pred)
+    test_mean_squared_error  = mean_squared_error(test[ 'POINTS']                 , test_pred )
+    full_mean_squared_error  = mean_squared_error(data_dict['norm_data']['POINTS'], full_pred )
 
     output_metrics = {
         'train_r2_score': train_r2_score,

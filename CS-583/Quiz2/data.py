@@ -73,9 +73,17 @@ def perform_fft(data):
 
     y_index_space = torch.Tensor(fft_data['POINTS'])
     y_freq_space = torch.fft.fft(y_index_space)
-    fft_data['POINTS'] = y_freq_space
-    
+    magnitude = torch.abs(y_freq_space)
+    phase = torch.angle(y_freq_space)
+
+    fft_data['POINTS'] = torch.stack([magnitude, phase], dim=1) 
+                        
     return fft_data
+
+def reverse_fft(y_freq_space):
+
+    y_index_space = torch.fft.ifft(y_freq_space.unsqueeze(0)).real
+    return y_index_space
 
 def split_data(data, latest_train_date, data_label=''):
 
@@ -142,6 +150,6 @@ def get_data():
     }
 
     out.update(split_data(norm_data, latest_train_date, data_label=''))
-    out.update(split_data(fft_data, latest_train_date, data_label='fft'))
+    out.update(split_data(fft_data, latest_train_date, data_label='fft_'))
 
     return out
