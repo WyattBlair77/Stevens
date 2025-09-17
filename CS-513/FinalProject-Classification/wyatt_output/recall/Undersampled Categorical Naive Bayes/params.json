@@ -1,0 +1,7 @@
+{
+    "alpha": 1.0,
+    "class_prior": null,
+    "fit_prior": true,
+    "force_alpha": true,
+    "min_categories": null
+}

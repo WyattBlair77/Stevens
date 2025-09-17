@@ -1,0 +1,11 @@
+Name of Model,Undersampled?,Accuracy,Precision,Recall,F1-Score
+KNN (N = 10),Y,83.40%,0.6,0.78,0.62
+SVM,Y,83.30%,0.6,0.79,0.62
+One Class SVM,N,71.40%,0.48,0.44,0.44
+CART,N,94.60%,0.76,0.58,0.62
+C 50,Y,82.60%,0.59,0.78,0.61
+Random Forest,N,94.10%,0.71,0.6,0.63
+Logistic Regression,Y,83%,0.6,0.8,0.61
+Naive Bayes (Bernoulli),Y,70%,0.58,0.77,0.58
+ANN,N,95%,0.76,0.62,0.66
+LDA,N,94%,0.72,0.68,0.7
