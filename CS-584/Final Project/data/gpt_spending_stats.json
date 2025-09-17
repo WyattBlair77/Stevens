@@ -1,0 +1,7 @@
+{
+    "total_cost": 4.219443449999967,
+    "total_tokens": 13765440,
+    "prompt_tokens": 8977379,
+    "completion_tokens": 4788061,
+    "successful_requests": 19258
+}
